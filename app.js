@@ -9,6 +9,10 @@ const DEFAULT_SB_URL = "https://hsvctxongbvtnlofsazd.supabase.co";
 const DEFAULT_SB_KEY = "sb_publishable_aZWobGm_WPP-H0vxx7VILA_6qiAFtIq";
 const DEFAULT_DEVICE_ID = "dev1";
 const AUTO_REFRESH_INTERVAL = 5000; // 5 seconds
+const DEFAULT_3D_CAMERA = {
+  eye: { x: 1.083, y: 0.0, z: 0.626 },
+  center: { x: 0, y: 0, z: 0 }
+};
 const STORAGE_KEYS = {
   sessionId: "fov.sessionId",
 };
@@ -58,6 +62,8 @@ const state = {
   lastTelemetryError: "",
   fovRows: [],
   autoRefreshTimer: null,
+  camera3d: null,
+  cameraListenerBound: false,
 };
 
 function nowISO() {
@@ -782,6 +788,9 @@ function drawPolar3D() {
   const el = ui.polar3d;
   if (!el || typeof Plotly === "undefined") return;
 
+  const existingCamera = el._fullLayout?.scene?.camera || null;
+  const camera = state.camera3d || existingCamera || DEFAULT_3D_CAMERA;
+
   const ok = { x: [], y: [], z: [], customdata: [] };
   const bad = { x: [], y: [], z: [], customdata: [] };
 
@@ -943,10 +952,7 @@ function drawPolar3D() {
         range: [-1.1, 1.1]
       },
       aspectmode: "cube",
-      camera: {
-        eye: { x: 1.083, y: 0.0, z: 0.626 },
-        center: { x: 0, y: 0, z: 0 }
-      }
+      camera
     },
     showlegend: true,
     legend: {
@@ -961,6 +967,16 @@ function drawPolar3D() {
   };
 
   Plotly.react(el, data, layout, { displayModeBar: false, responsive: true });
+
+  if (!state.cameraListenerBound) {
+    el.on("plotly_relayout", (evt) => {
+      if (!evt) return;
+      if (evt["scene.camera"] || Object.keys(evt).some((k) => k.startsWith("scene.camera"))) {
+        state.camera3d = el._fullLayout?.scene?.camera || state.camera3d;
+      }
+    });
+    state.cameraListenerBound = true;
+  }
 }
 
 function getRanges() {
